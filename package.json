@@ -1,0 +1,23 @@
+{
+  "name": "kiwi-app",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "solid-js": "^1.7.11"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "jsdom": "^30.0.1",
+    "vite": "^5.4.0",
+    "vite-plugin-solid": "^2.11.14",
+    "vitest": "^0.34.1"
+  }
+}
