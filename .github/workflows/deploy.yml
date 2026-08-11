@@ -24,7 +24,7 @@ jobs:
       - name: Install pnpm
         run: |
           corepack enable
-          corepack prepare pnpm@latest --activate
+          corepack prepare pnpm@8 --activate
           corepack pnpm --version
       - name: Install dependencies
         run: corepack pnpm install
