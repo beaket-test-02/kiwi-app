@@ -30,3 +30,41 @@ test('title screen transitions to the chronicle battle screen', async () => {
   expect(container.querySelector('.hero-combatant img')?.getAttribute('src')).toMatch(/kiwi-portrait/)
   expect(container.querySelector('.enemy-portrait img')?.getAttribute('src')).toMatch(/assets\/monsters\//)
 })
+
+test('battle keyboard commands run only the allowed commands once', async () => {
+  container = document.body.appendChild(document.createElement('div'))
+  dispose = solidRender(() => <App />, container)
+
+  screen.getByText(/新たなる旅を始める/).click()
+  await new Promise((resolve) => setTimeout(resolve, 0))
+
+  const turn = () => container.querySelector('.turn')?.textContent
+  expect(turn()).toContain('第 1 刻')
+  expect(container.querySelectorAll('kbd')).toHaveLength(2)
+  expect(container.textContent).not.toContain('SPACE / ENTER')
+
+  window.dispatchEvent(new KeyboardEvent('keydown', { key: '1' }))
+  expect(turn()).toContain('第 2 刻')
+
+  window.dispatchEvent(new KeyboardEvent('keydown', { key: '2' }))
+  expect(turn()).toContain('第 3 刻')
+
+  window.dispatchEvent(new KeyboardEvent('keydown', { key: '3' }))
+  window.dispatchEvent(new KeyboardEvent('keydown', { key: '1', repeat: true }))
+  window.dispatchEvent(new KeyboardEvent('keydown', { key: '1', ctrlKey: true }))
+  expect(turn()).toContain('第 3 刻')
+})
+
+test('battle keyboard commands ignore editable targets', async () => {
+  container = document.body.appendChild(document.createElement('div'))
+  dispose = solidRender(() => <App />, container)
+
+  screen.getByText(/新たなる旅を始める/).click()
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  const input = document.body.appendChild(document.createElement('input'))
+
+  input.dispatchEvent(new KeyboardEvent('keydown', { key: '1', bubbles: true }))
+  expect(container.querySelector('.turn')?.textContent).toContain('第 1 刻')
+
+  input.remove()
+})
