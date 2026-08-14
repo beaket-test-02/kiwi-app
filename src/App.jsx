@@ -1,4 +1,4 @@
-import { createSignal, For, Match, Switch } from 'solid-js'
+import { createSignal, For, Match, onCleanup, onMount, Switch } from 'solid-js'
 import './style.css'
 import { getMonstersByCategory, MONSTER_CATEGORY } from './data/monsters'
 
@@ -119,6 +119,25 @@ export default function App() {
     setMessage(`薬草を用い、兵力を ${healed - before} 回復した。`)
   }
 
+  const handleBattleKeydown = (event) => {
+    const target = event.target
+    const isEditable = target instanceof HTMLElement && (
+      target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+    )
+
+    if (
+      screen() !== 'playing' || event.repeat || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || isEditable
+    ) return
+
+    if (event.key === '1') attack()
+    if (event.key === '2') heal()
+  }
+
+  onMount(() => {
+    window.addEventListener('keydown', handleBattleKeydown)
+    onCleanup(() => window.removeEventListener('keydown', handleBattleKeydown))
+  })
+
   const activeSkill = () => getSkillByLevel(level())
 
   return (
@@ -199,12 +218,12 @@ export default function App() {
                 <nav class="commands" aria-label="戦闘コマンド">
                   <button type="button" onClick={attack}><kbd>1</kbd><span>攻撃</span><small>{activeSkill().name}</small></button>
                   <button type="button" onClick={heal}><kbd>2</kbd><span>休息</span><small>薬草を用いる</small></button>
-                  <button type="button" onClick={reset}><kbd>3</kbd><span>再編</span><small>戦況を初期化</small></button>
+                  <button type="button" onClick={reset}><span>再編</span><small>戦況を初期化</small></button>
                 </nav>
               </aside>
             </div>
 
-            <footer class="footer-bar"><span>SPACE / ENTER　決定</span><span>辺境軍記録 第壱巻</span></footer>
+            <footer class="footer-bar"><span>辺境軍記録 第壱巻</span></footer>
           </section>
         </Match>
       </Switch>
