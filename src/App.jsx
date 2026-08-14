@@ -1,16 +1,20 @@
 import { createSignal, For, Match, onCleanup, onMount, Switch } from 'solid-js'
 import './style.css'
 import { getMonstersByCategory, MONSTER_CATEGORY } from './data/monsters'
+import {
+  applyLevels,
+  checkQuests,
+  createEnemy,
+  getAttackPower,
+  getEnemyDamage,
+  getHealAmount,
+  getNextThreshold,
+  getPlayerMaxHp,
+  getSkillByLevel
+} from './combat'
 
 const enemies = getMonstersByCategory(MONSTER_CATEGORY.COMMON)
 const bosses = getMonstersByCategory(MONSTER_CATEGORY.BOSS)
-
-const skills = [
-  { level: 1, name: '嘴撃', desc: '鋭き嘴をもって敵の急所を穿つ。', power: 0 },
-  { level: 3, name: '飛羽撃', desc: '風をまとい、間合いの外より強襲する。', power: 1 },
-  { level: 5, name: '翠星砲', desc: '蓄えた翠光を一条の矢として放つ。', power: 2 },
-  { level: 8, name: '暁光烈破', desc: '曙光を呼び、戦場を一閃する奥義。', power: 3 }
-]
 
 const questTemplates = [
   { id: 1, title: '魔物を五体討伐せよ', type: 'kill', target: 5, current: 0, reward: 5, done: false },
@@ -18,26 +22,7 @@ const questTemplates = [
   { id: 3, title: '練度三へ到達せよ', type: 'level', target: 3, current: 1, reward: 6, done: false }
 ]
 
-const getNextThreshold = (level) => 6 + level * 3
-const getSkillByLevel = (level) => [...skills].reverse().find((skill) => level >= skill.level) || skills[0]
-const getPlayerMaxHp = (level) => 14 + Math.floor(level * 2)
-const getHealAmount = (level) => 4 + Math.floor(level / 2)
-const getEnemyDamage = (enemy, level) => enemy.isBoss ? 4 + Math.floor(level / 2) : 1 + Math.floor(level / 2)
-const getAttackPower = (level, skill) => Math.max(1, level + skill.power + Math.floor(Math.random() * 3))
-
-const getNewEnemy = (level, isBoss = false) => {
-  const source = isBoss ? bosses : enemies
-  const base = source[Math.floor(Math.random() * source.length)]
-  const maxHp = base.baseHp + Math.floor(level * 1.5) + Math.floor(Math.random() * 4)
-  return { ...base, hp: maxHp, maxHp, reward: base.reward + level, isBoss }
-}
-
-const checkQuests = (items, nextLevel, nextKillCount, bossCleared) => items.map((quest) => {
-  if (quest.done) return quest
-  const progress = quest.type === 'level' ? nextLevel : quest.type === 'kill' ? nextKillCount : bossCleared ? 1 : 0
-  const current = Math.min(quest.target, progress)
-  return { ...quest, current, done: current >= quest.target }
-})
+const getNewEnemy = (level, isBoss = false) => createEnemy(level, isBoss ? bosses : enemies, isBoss, Math.random)
 
 function Meter(props) {
   const width = () => Math.max(0, Math.min(100, Math.round((props.value / props.max) * 100)))
@@ -66,20 +51,10 @@ export default function App() {
   const backToTitle = () => { resetGame(); setScreen('title') }
   const reset = () => { resetGame(); setScreen('playing') }
 
-  const applyLevels = (earnedXp, startingLevel) => {
-    let nextXp = earnedXp
-    let nextLevel = startingLevel
-    while (nextXp >= getNextThreshold(nextLevel)) {
-      nextXp -= getNextThreshold(nextLevel)
-      nextLevel += 1
-    }
-    return [nextXp, nextLevel]
-  }
-
   const attack = () => {
     if (screen() !== 'playing' || playerHp() <= 0) return
     const target = enemy()
-    const damage = getAttackPower(level(), getSkillByLevel(level()))
+    const damage = getAttackPower(level(), getSkillByLevel(level()), Math.random)
     const remaining = Math.max(0, target.hp - damage)
     setTurn((value) => value + 1)
 
