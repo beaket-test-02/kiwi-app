@@ -26,8 +26,17 @@ const defeatEnemy = (hits) => {
   for (let index = 0; index < hits; index += 1) screen.getByRole('button', { name: /攻撃/ }).click()
 }
 
+const remount = async () => {
+  dispose()
+  container.remove()
+  container = document.body.appendChild(document.createElement('div'))
+  dispose = solidRender(() => <App />, container)
+  await new Promise((resolve) => setTimeout(resolve, 0))
+}
+
 afterEach(() => {
   vi.restoreAllMocks()
+  localStorage.clear()
   if (typeof dispose === 'function') dispose()
   if (container?.parentNode) container.parentNode.removeChild(container)
   container = null
@@ -162,4 +171,86 @@ test('gameover returns to the title and reorganization resets while staying in p
   expect(playerStats()).toContain('16 / 16')
   expect(container.querySelector('.turn')?.textContent).toContain('第 1 刻')
   expect(container.textContent).toContain('討伐0')
+})
+
+test('continue is disabled without a save and resumes from the last defeated enemy after reopening', async () => {
+  await startGame()
+  await remount()
+  expect(screen.getByRole('button', { name: /続きから/ }).disabled).toBe(true)
+
+  queueRandom(0, 0)
+  screen.getByText(/新たなる旅を始める/).click()
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  defeatEnemy(3)
+  expect(container.textContent).toContain('討伐1')
+  // Turns spent after the last victory are not saved.
+  queueRandom(0)
+  screen.getByRole('button', { name: /攻撃/ }).click()
+
+  await remount()
+  const continueButton = screen.getByRole('button', { name: /続きから/ })
+  expect(continueButton.disabled).toBe(false)
+  queueRandom(0, 0)
+  continueButton.click()
+  await new Promise((resolve) => setTimeout(resolve, 0))
+
+  expect(container.textContent).toContain('討伐1')
+  expect(container.querySelector('.turn')?.textContent).toContain('第 4 刻')
+  expect(screen.getByText('敵部隊')).toBeTruthy()
+})
+
+test('starting over asks before deleting the save', async () => {
+  await startGame()
+  defeatEnemy(3)
+  await remount()
+
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+  screen.getByText(/新たなる旅を始める/).click()
+  expect(confirm).toHaveBeenCalledTimes(1)
+  expect(screen.getByRole('button', { name: /続きから/ }).disabled).toBe(false)
+
+  queueRandom(0, 0)
+  screen.getByText(/新たなる旅を始める/).click()
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  expect(confirm).toHaveBeenCalledTimes(2)
+  expect(container.textContent).toContain('討伐0')
+  expect(localStorage.getItem('kiwi-app:save')).toBeNull()
+})
+
+test('reorganization asks before deleting the save and keeps playing when cancelled', async () => {
+  await startGame()
+  defeatEnemy(3)
+
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+  screen.getByRole('button', { name: /再編/ }).click()
+  expect(confirm).toHaveBeenCalledTimes(1)
+  expect(container.textContent).toContain('討伐1')
+  expect(localStorage.getItem('kiwi-app:save')).not.toBeNull()
+})
+
+test('defeat keeps the save from the last victory', async () => {
+  await startGame()
+  // After the first victory, the next enemy is a 17 HP turtle that outlasts 1-damage attacks.
+  queueRandom(0.999, 0.999, 0.999, 0.9, 0.999)
+  for (let index = 0; index < 3; index += 1) screen.getByRole('button', { name: /攻撃/ }).click()
+  expect(container.textContent).toContain('討伐1')
+
+  for (let index = 0; index < 30 && !screen.queryByText('遠征失敗'); index += 1) {
+    queueRandom(0)
+    screen.getByRole('button', { name: /攻撃/ }).click()
+  }
+  expect(screen.getByText('遠征失敗')).toBeTruthy()
+  screen.getByRole('button', { name: /年代記を閉じる/ }).click()
+
+  queueRandom(0, 0)
+  screen.getByRole('button', { name: /続きから/ }).click()
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  expect(container.textContent).toContain('討伐1')
+})
+
+test('a save with the wrong shape counts as no save', async () => {
+  localStorage.setItem('kiwi-app:save', JSON.stringify({ version: 1, savedAt: '2026-10-08T00:00:00.000Z', state: { level: 'x' } }))
+  container = document.body.appendChild(document.createElement('div'))
+  dispose = solidRender(() => <App />, container)
+  expect(screen.getByRole('button', { name: /続きから/ }).disabled).toBe(true)
 })

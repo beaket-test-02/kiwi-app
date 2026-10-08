@@ -137,6 +137,7 @@ button { font: inherit; }
 .prologue { color: #d0c4a6; line-height: 2.2; font-size: 13px; letter-spacing: .12em; text-shadow: 1px 2px #000; }
 .start-command { margin-top: 26px; min-width: 300px; padding: 13px 24px; border: 1px solid #ac8e4e; color: #e6d8b2; background: rgba(13,20,18,.9); letter-spacing: .15em; cursor: pointer; box-shadow: inset 0 0 0 3px #283029; }
 .start-command:hover { color: #fff1c5; background: #253129; }.start-command b { margin-right: 10px; color: #bc9b4d; }
+.start-command + .start-command { margin-top: 12px; }.start-command:disabled { opacity: .45; cursor: not-allowed; }.start-command:disabled:hover { color: #e6d8b2; background: rgba(13,20,18,.9); }
 .title-footer { position: absolute; bottom: 35px; color: #6f756b; font-size: 8px; letter-spacing: .2em; }
 .ending-screen { background-position: 70% center; }.ending-copy { color: #a36c59; letter-spacing: .7em; }.ending-screen h1 { color: #d9c496; letter-spacing: .2em; }.ending-screen p { color: #b6ad94; }
 

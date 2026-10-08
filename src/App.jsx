@@ -12,6 +12,7 @@ import {
   getPlayerMaxHp,
   getSkillByLevel
 } from './combat'
+import { clearSave, hasSave, loadGame, saveGame } from './save'
 
 const enemies = getMonstersByCategory(MONSTER_CATEGORY.COMMON)
 const bosses = getMonstersByCategory(MONSTER_CATEGORY.BOSS)
@@ -23,6 +24,25 @@ const questTemplates = [
 ]
 
 const getNewEnemy = (level, isBoss = false) => createEnemy(level, isBoss ? bosses : enemies, isBoss, Math.random)
+
+const isCount = (value, min = 0) => Number.isInteger(value) && value >= min
+
+// 保存データの形が合わないときは、保存データなしとして扱う
+const isSavedState = (state) => (
+  state !== null && typeof state === 'object' &&
+  isCount(state.level, 1) && isCount(state.xp) && isCount(state.killCount) && isCount(state.turn, 1) &&
+  isCount(state.playerHp, 1) && state.playerHp <= getPlayerMaxHp(state.level) &&
+  typeof state.bossDefeated === 'boolean' &&
+  Array.isArray(state.quests) && state.quests.length === questTemplates.length &&
+  state.quests.every((quest, index) => quest?.id === questTemplates[index].id && isCount(quest.current) && typeof quest.done === 'boolean')
+)
+
+const loadSavedState = () => {
+  const state = loadGame()
+  return isSavedState(state) ? state : null
+}
+
+const confirmDiscard = () => window.confirm('保存した進行は消えます。はじめからにしますか？')
 
 function Meter(props) {
   const width = () => Math.max(0, Math.min(100, Math.round((props.value / props.max) * 100)))
@@ -40,6 +60,7 @@ export default function App() {
   const [quests, setQuests] = createSignal(questTemplates.map((quest) => ({ ...quest })))
   const [playerHp, setPlayerHp] = createSignal(getPlayerMaxHp(1))
   const [turn, setTurn] = createSignal(1)
+  const [canContinue, setCanContinue] = createSignal(loadSavedState() !== null)
 
   const resetGame = () => {
     setLevel(1); setXp(0); setEnemy(getNewEnemy(1)); setKillCount(0); setBossDefeated(false)
@@ -47,9 +68,35 @@ export default function App() {
     setMessage('東雲の海辺に、妖しき気配が満ちている。')
   }
 
-  const startGame = () => { resetGame(); setScreen('playing') }
-  const backToTitle = () => { resetGame(); setScreen('title') }
-  const reset = () => { resetGame(); setScreen('playing') }
+  // KIWI-SPEC-006: 撃破時（練度が上がるのも撃破時だけ）に保存する。再開は新しい敵から始める
+  const saveProgress = () => {
+    saveGame({
+      level: level(), xp: xp(), killCount: killCount(), bossDefeated: bossDefeated(),
+      quests: quests().map(({ id, current, done }) => ({ id, current, done })), playerHp: playerHp(), turn: turn()
+    })
+    setCanContinue(hasSave())
+  }
+
+  const discardSave = () => {
+    if (hasSave() && !confirmDiscard()) return false
+    clearSave(); setCanContinue(false)
+    return true
+  }
+
+  const startGame = () => { if (!discardSave()) return; resetGame(); setScreen('playing') }
+  const continueGame = () => {
+    const state = loadSavedState()
+    if (!state) { setCanContinue(false); return }
+    setLevel(state.level); setXp(state.xp); setKillCount(state.killCount); setBossDefeated(state.bossDefeated)
+    setQuests(questTemplates.map((quest, index) => ({ ...quest, current: state.quests[index].current, done: state.quests[index].done })))
+    setPlayerHp(state.playerHp); setTurn(state.turn)
+    setEnemy(getNewEnemy(state.level, !state.bossDefeated && state.killCount >= 5))
+    setMessage('記録をたどり、旅の続きを始める。')
+    setScreen('playing')
+  }
+  // 力尽きても、最後に敵を倒した時点の保存は残す
+  const backToTitle = () => { resetGame(); setCanContinue(loadSavedState() !== null); setScreen('title') }
+  const reset = () => { if (!discardSave()) return; resetGame(); setScreen('playing') }
 
   const attack = () => {
     if (screen() !== 'playing' || playerHp() <= 0) return
@@ -81,6 +128,7 @@ export default function App() {
 
     setLevel(nextLevel); setXp(nextXp); setKillCount(nextKills); setBossDefeated(nextBoss); setQuests(updatedQuests)
     setEnemy(getNewEnemy(nextLevel, !nextBoss && nextKills >= 5))
+    saveProgress()
     setMessage(leveled ? `勝鬨が響く。練度 ${nextLevel} に昇り、${getSkillByLevel(nextLevel).name}を修得した。` : `${target.name}を討ち取った。功績 ${target.reward + bonus} を得た。`)
   }
 
@@ -126,6 +174,7 @@ export default function App() {
             <p class="title-lead">遥かなる海と、名もなき勇者の年代記</p>
             <div class="title-rule"><span>第一章</span></div>
             <p class="prologue">王暦一五二二年。東方の辺境を覆う霧の中、<br />小さき戦士は、ただ一羽で旅立った。</p>
+            <button class="start-command" type="button" onClick={continueGame} disabled={!canContinue()}><b>▶</b> 続きから</button>
             <button class="start-command" type="button" onClick={startGame}><b>▶</b> 新たなる旅を始める</button>
             <div class="title-footer">© 1522 KIWI ROYAL ARCHIVES</div>
           </section>
